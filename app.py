@@ -108,9 +108,7 @@ def save_turn_db(data: dict):
 # ── UI Navigation ─────────────────────────────────────────────────────────────
 page = st.sidebar.radio("Navigasi", ["Simulasi Interview", "Analytics Dashboard"])
 
-# ──────────────────────────────────────────────────────────────────────────────
 # PAGE 1: SIMULASI INTERVIEW
-# ──────────────────────────────────────────────────────────────────────────────
 if page == "Simulasi Interview":
     st.title("🎯 AI Business Simulation Interviewer")
 
@@ -256,9 +254,8 @@ if page == "Simulasi Interview":
                     del st.session_state[key]
                 st.rerun()
 
-# ──────────────────────────────────────────────────────────────────────────────
+
 # PAGE 2: ANALYTICS DASHBOARD
-# ──────────────────────────────────────────────────────────────────────────────
 elif page == "Analytics Dashboard":
     st.title("📊 Alumni Interview Analytics")
 
