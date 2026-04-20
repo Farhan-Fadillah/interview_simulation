@@ -2,6 +2,7 @@ import streamlit as st
 import json
 import uuid
 import pandas as pd
+import plotly.express as px
 from datetime import datetime, timezone
 from openai import OpenAI
 from supabase import create_client, Client
@@ -54,7 +55,7 @@ OUTPUT FORMAT — WAJIB DIIKUTI
 ━━━━━━━━━━━━━━━━━━━━━━━
 Output HANYA objek JSON tanpa markdown backtick apapun.
 
-{{
+{
   "stop_interview": false,
   "question": "string atau null",
   "interviewer_note": "string atau null",
@@ -62,17 +63,17 @@ Output HANYA objek JSON tanpa markdown backtick apapun.
   "is_pressure_test": false,
   "current_state": "opening|exploration|pressure_test|user_centricity|closing",
   "question_number": 1,
-  "internal_evaluation": {{
+  "internal_evaluation": {
     "logical_structure": null,
     "feasibility": null,
     "user_centricity": null,
     "professional_tone": null
-  }},
+  },
   "final_scores": null
-}}
+}
 
 Saat stop_interview=true, final_scores harus diisi dengan skor 1-5 dan summary:
-{{
+{
   "logical_structure": 1-5,
   "feasibility": 1-5,
   "user_centricity": 1-5,
@@ -80,7 +81,7 @@ Saat stop_interview=true, final_scores harus diisi dengan skor 1-5 dan summary:
   "total": sum,
   "tier_recommendation": "Tier 1 - Lulus Otomatis | Tier 2 - Lulus Bersyarat | Tier 3 - Revisi / Tunggu",
   "summary": "2-3 kalimat evaluasi"
-}}
+}
 """
 
 # ── Helper Functions ──────────────────────────────────────────────────────────
@@ -138,6 +139,7 @@ if page == "Simulasi Interview":
                 st.session_state.llm_history = [{"role": "system", "content": SYSTEM_PROMPT.format(interview_topic=topic, company_profile=profile)}]
                 st.session_state.question_count = 1
                 st.session_state.is_done = False
+                
                 # Simpan data awal sesi ke DB agar Foreign Key di tabel turns terpenuhi
                 initial_session = {
                     "session_id": st.session_state.session_id,
@@ -268,57 +270,136 @@ elif page == "Analytics Dashboard":
         st.info("Belum ada data sesi interview. Silakan jalankan simulasi terlebih dahulu.")
     else:
         df = pd.DataFrame(sessions_data)
-        completed_df = df.dropna(subset=['total_score'])
-
-        # KPIs
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Total Sessions", len(df))
-        pass_rate = 0
-        if not completed_df.empty:
-            passed = len(completed_df[completed_df['tier'].str.contains('Tier 1|Tier 2', na=False)])
-            pass_rate = (passed / len(completed_df)) * 100
-        col2.metric("Pass Rate", f"{pass_rate:.1f}%")
-        col3.metric("Avg Score", f"{completed_df['total_score'].mean():.1f}" if not completed_df.empty else "0")
-        col4.metric("Completed", len(completed_df))
-
-        st.divider()
-
-        # Charts
-        col_c1, col_c2 = st.columns(2)
-        with col_c1:
-            st.subheader("Distribusi Tier")
-            if not completed_df.empty:
-                tier_counts = completed_df['tier'].value_counts()
-                st.bar_chart(tier_counts)
         
-        with col_c2:
-            st.subheader("Skor Rata-rata per Dimensi")
+        # Bersihkan data Null/None untuk keperluan filter
+        df['candidate_name'] = df['candidate_name'].fillna("Unknown")
+        df['interview_topic'] = df['interview_topic'].fillna("Unknown")
+        df['tier'] = df['tier'].fillna("Belum Selesai")
+
+        # ── FILTERING PANEL ──
+        st.markdown("### 🔍 Filter Data")
+        f_col1, f_col2, f_col3 = st.columns(3)
+        with f_col1:
+            filter_nama = st.multiselect("Nama Kandidat", options=sorted(df['candidate_name'].unique()))
+        with f_col2:
+            filter_topik = st.multiselect("Topik Interview", options=sorted(df['interview_topic'].unique()))
+        with f_col3:
+            filter_tier = st.multiselect("Tier Hasil", options=sorted(df['tier'].unique()))
+
+        # Apply Filters
+        filtered_df = df.copy()
+        if filter_nama:
+            filtered_df = filtered_df[filtered_df['candidate_name'].isin(filter_nama)]
+        if filter_topik:
+            filtered_df = filtered_df[filtered_df['interview_topic'].isin(filter_topik)]
+        if filter_tier:
+            filtered_df = filtered_df[filtered_df['tier'].isin(filter_tier)]
+
+        st.divider()
+
+        if filtered_df.empty:
+            st.info("Tidak ada data yang cocok dengan filter saat ini.")
+        else:
+            # Memisahkan data yang sudah komplit (ada skor akhir) untuk perhitungan KPI dan chart
+            completed_df = filtered_df.dropna(subset=['total_score'])
+
+            # ── KPIs ──
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Total Sessions (Filtered)", len(filtered_df))
+            
+            pass_rate = 0
             if not completed_df.empty:
-                avg_scores = completed_df[['logical_structure', 'feasibility', 'user_centricity', 'professional_tone']].mean()
-                st.bar_chart(avg_scores)
+                passed = len(completed_df[completed_df['tier'].str.contains('Tier 1|Tier 2', na=False)])
+                pass_rate = (passed / len(completed_df)) * 100
+            
+            col2.metric("Pass Rate (Tier 1 & 2)", f"{pass_rate:.1f}%")
+            col3.metric("Avg Total Score", f"{completed_df['total_score'].mean():.1f}" if not completed_df.empty else "0")
+            col4.metric("Completed Sessions", len(completed_df))
 
-        st.divider()
+            st.markdown("<br>", unsafe_allow_html=True)
 
-        # Data Table
-        st.subheader("Riwayat Sesi Terakhir")
-        display_df = df[['candidate_name', 'interview_topic', 'total_score', 'tier', 'started_at']].copy()
-        display_df['started_at'] = pd.to_datetime(display_df['started_at']).dt.strftime('%Y-%m-%d %H:%M')
-        st.dataframe(display_df, use_container_width=True)
+            # ── DEEP ANALYTICS CHARTS ──
+            c_chart1, c_chart2 = st.columns(2)
+            
+            with c_chart1:
+                st.subheader("Distribusi Rekomendasi (Tier)")
+                if not completed_df.empty:
+                    tier_counts = completed_df['tier'].value_counts().reset_index()
+                    tier_counts.columns = ['Tier', 'Jumlah']
+                    fig_tier = px.pie(tier_counts, names='Tier', values='Jumlah', hole=0.4, color_discrete_sequence=px.colors.sequential.Teal)
+                    st.plotly_chart(fig_tier, use_container_width=True)
+                else:
+                    st.write("Belum ada sesi yang selesai untuk diplot.")
 
-        st.divider()
-        
-        # AI Insight Generator
-        st.subheader("🤖 AI Insight Generator")
-        if st.button("Generate Cohort Analysis dengan GPT-4o"):
-            with st.spinner("Menganalisis data..."):
-                stats_summary = {
-                    "total_completed": len(completed_df),
-                    "avg_scores": avg_scores.to_dict() if not completed_df.empty else {},
-                    "tiers": tier_counts.to_dict() if not completed_df.empty else {}
-                }
-                prompt = f"""Kamu adalah analis HR. Berdasarkan data agregat ini, berikan analisis 3 paragraf mengenai kekuatan/kelemahan umum kandidat dan rekomendasi: {json.dumps(stats_summary)}"""
-                
-                resp = client.chat.completions.create(
-                    model=MODEL, messages=[{"role": "user", "content": prompt}], temperature=0.5
-                )
-                st.info(resp.choices[0].message.content.strip())
+            with c_chart2:
+                st.subheader("Rata-rata Skor per Dimensi (Max 5)")
+                if not completed_df.empty:
+                    avg_dims = completed_df[['logical_structure', 'feasibility', 'user_centricity', 'professional_tone']].mean().reset_index()
+                    avg_dims.columns = ['Dimensi Penilaian', 'Skor Rata-rata']
+                    # Mempercantik nama label dimensi
+                    avg_dims['Dimensi Penilaian'] = avg_dims['Dimensi Penilaian'].str.replace('_', ' ').str.title()
+                    
+                    fig_dims = px.bar(avg_dims, x='Skor Rata-rata', y='Dimensi Penilaian', orientation='h', text='Skor Rata-rata')
+                    fig_dims.update_traces(texttemplate='%{text:.2f}', textposition='outside')
+                    fig_dims.update_layout(xaxis=dict(range=[0, 5.5])) # Range max 5 tapi diberi ruang untuk label
+                    st.plotly_chart(fig_dims, use_container_width=True)
+                else:
+                    st.write("Belum ada sesi yang selesai untuk diplot.")
+
+            # Menambahkan chart Distribusi Topik
+            st.subheader("Distribusi Topik Interview")
+            topic_counts = filtered_df['interview_topic'].value_counts().reset_index()
+            topic_counts.columns = ['Topik', 'Jumlah Sesi']
+            fig_topic = px.bar(topic_counts, x='Topik', y='Jumlah Sesi', color='Topik')
+            fig_topic.update_layout(showlegend=False)
+            st.plotly_chart(fig_topic, use_container_width=True)
+
+            st.divider()
+
+            # ── Data Table ──
+            st.subheader("Detail Sesi Interview")
+            display_df = filtered_df[['candidate_name', 'interview_topic', 'total_score', 'tier', 'started_at']].copy()
+            display_df['started_at'] = pd.to_datetime(display_df['started_at']).dt.strftime('%Y-%m-%d %H:%M')
+            display_df.rename(columns={
+                'candidate_name': 'Nama Kandidat', 'interview_topic': 'Topik', 
+                'total_score': 'Total Skor', 'tier': 'Tier', 'started_at': 'Tanggal Mulai'
+            }, inplace=True)
+            st.dataframe(display_df, use_container_width=True)
+
+            st.divider()
+            
+            # ── AI Strategic Insight (Generative AI Analytics) ──
+            st.subheader("🤖 AI Strategic Insight (Berdasarkan Filter)")
+            st.markdown("AI akan membaca kumpulan data kandidat yang sedang Anda filter saat ini untuk menemukan pola kompetensi, kelemahan umum, dan memberikan masukan HR tingkat lanjut.")
+            
+            if st.button("Generate Analisis Mendalam", type="primary"):
+                if completed_df.empty:
+                    st.warning("Data yang di-filter tidak memiliki sesi yang telah selesai (Completed) untuk dianalisis.")
+                else:
+                    with st.spinner("Menganalisis tren performa kandidat..."):
+                        avg_scores_dict = avg_dims.set_index('Dimensi Penilaian')['Skor Rata-rata'].to_dict()
+                        tier_dict = tier_counts.set_index('Tier')['Jumlah'].to_dict()
+                        
+                        # Mengambil sampel summary evaluasi kandidat untuk konteks kualitatif (maks 10 sampel agar tidak over-token)
+                        sample_summaries = completed_df['summary'].dropna().head(10).tolist()
+                        
+                        stats_summary = {
+                            "total_kandidat_dinilai": len(completed_df),
+                            "distribusi_tier": tier_dict,
+                            "rata_rata_dimensi_skor": avg_scores_dict,
+                            "sampel_catatan_evaluasi": sample_summaries
+                        }
+                        
+                        prompt = f"""Anda adalah Chief HR Officer (CHRO) dan Ahli Rekrutmen. 
+Berdasarkan data agregat dari kelompok kandidat yang sedang di-filter ini:
+{json.dumps(stats_summary, ensure_ascii=False)}
+
+Tuliskan Analisis Kohort Mendalam (maksimal 3 paragraf). Fokus pada:
+1. Analisis kekuatan dan kelemahan kolektif berdasarkan rata-rata dimensi skor (contoh: jika user_centricity rendah, apa dampaknya?).
+2. Pola yang terlihat dari sampel catatan evaluasi.
+3. Rekomendasi program pelatihan atau fokus pertanyaan wawancara selanjutnya untuk kelompok (cohort) dengan profil seperti ini."""
+                        
+                        resp = client.chat.completions.create(
+                            model=MODEL, messages=[{"role": "user", "content": prompt}], temperature=0.5
+                        )
+                        st.info(resp.choices[0].message.content.strip())
