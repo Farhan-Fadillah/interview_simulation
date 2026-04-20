@@ -138,6 +138,15 @@ if page == "Simulasi Interview":
                 st.session_state.llm_history = [{"role": "system", "content": SYSTEM_PROMPT.format(interview_topic=topic, company_profile=profile)}]
                 st.session_state.question_count = 1
                 st.session_state.is_done = False
+                # Simpan data awal sesi ke DB agar Foreign Key di tabel turns terpenuhi
+                initial_session = {
+                    "session_id": st.session_state.session_id,
+                    "candidate_name": st.session_state.name,
+                    "interview_topic": st.session_state.topic,
+                    "company_profile": st.session_state.profile,
+                    "started_at": st.session_state.started_at
+                }
+                save_session_db(initial_session)
                 st.rerun()
 
     # Chat Interface
