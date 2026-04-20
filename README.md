@@ -8,7 +8,11 @@
 
 **AI Business Simulation Interviewer** is a full-stack AI application built for **Alumni** — an online technology bootcamp platform with over 50,000 alumni across five major cities in Indonesia. The platform addresses a critical bottleneck in the candidate selection process: conducting consistent, scalable, and objective business simulation interviews.
 
+<img width="1184" height="663" alt="image" src="https://github.com/user-attachments/assets/ee3f92db-da0c-4f4d-bcf7-bc145893e3e5" />
+
 Traditional interview processes are resource-intensive, prone to interviewer bias, and difficult to scale when candidate volume is high. This application replaces or augments the human interviewer in the initial screening phase by deploying a **GPT-4o-powered AI interviewer** that dynamically challenges candidates with real-world business scenarios, probes shallow answers, and applies deliberate pressure tests — all while maintaining a professional and structured interview experience.
+
+<img width="1181" height="666" alt="image" src="https://github.com/user-attachments/assets/3262871d-323f-47b0-b127-c39335b30feb" />
 
 All session data, including per-turn responses, sentiment signals, and final evaluation scores, are persisted to a **Supabase** (PostgreSQL) backend, enabling rich retrospective analysis through a dedicated **Analytics Dashboard** built directly into the app.
 
@@ -36,6 +40,8 @@ All session data, including per-turn responses, sentiment signals, and final eva
 ## 🌟 Why This Project Matters
 
 The intersection of **Generative AI and Human Resources** is one of the most impactful frontiers in enterprise technology today. This project is a direct, production-oriented embodiment of that intersection.
+
+<img width="1181" height="664" alt="image" src="https://github.com/user-attachments/assets/4cfb5b34-6b27-4f78-9356-11c5c9fccf0d" />
 
 ### The Problem It Solves
 
@@ -147,6 +153,8 @@ The application is organized into two primary functional areas that together cre
 
 ### 🗣️ Simulasi Interview (Candidate Interface)
 
+<img width="1919" height="420" alt="image" src="https://github.com/user-attachments/assets/45c25a72-ac1e-486a-9acb-c4c60905d98a" />
+
 | Feature | Description |
 |---|---|
 | **Candidate Setup Form** | Collects name and interview topic before session begins |
@@ -161,6 +169,10 @@ The application is organized into two primary functional areas that together cre
 | **New Session Reset** | One-click reset to clear all session state and restart a fresh interview |
 
 ### 📊 Analytics Dashboard (HR Interface)
+
+<img width="1919" height="927" alt="image" src="https://github.com/user-attachments/assets/5415a3d6-6d0d-44a7-b09a-098d6f3297f1" />
+
+
 
 | Feature | Description |
 |---|---|
@@ -211,67 +223,6 @@ The application is organized into two primary functional areas that together cre
 | `sentiment_label` | `text` | Sentiment classification of the answer (`positive / neutral / negative`) |
 | `sentiment_score` | `float` | Confidence score of sentiment classification (0.0–1.0) |
 | `timestamp` | `timestamptz` | UTC timestamp of this turn |
-
----
-
-## 🛠️ Tech Stack
-
-| Layer | Technology |
-|---|---|
-| **Frontend / UI** | [Streamlit](https://streamlit.io/) |
-| **AI / LLM** | [OpenAI GPT-4o](https://platform.openai.com/) via `openai` Python SDK |
-| **Database** | [Supabase](https://supabase.com/) (PostgreSQL) via `supabase-py` |
-| **Data Processing** | [Pandas](https://pandas.pydata.org/) |
-| **Data Visualization** | [Plotly Express](https://plotly.com/python/plotly-express/) |
-| **Language** | Python 3.10+ |
-
----
-
-## ⚙️ Setup & Configuration
-
-### Prerequisites
-
-- Python 3.10 or higher
-- An active OpenAI API key with access to `gpt-4o`
-- A Supabase project with the `sessions` and `turns` tables created per the schema above
-
-### Installation
-
-```bash
-git clone https://github.com/your-username/ai-interview-simulator.git
-cd ai-interview-simulator
-pip install -r requirements.txt
-```
-
-### Secrets Configuration
-
-Create a `.streamlit/secrets.toml` file in the project root:
-
-```toml
-OPENAI_API_KEY = "sk-..."
-OPENAI_BASE_URL = "https://api.openai.com/v1"   # Optional, defaults to OpenAI
-SUPABASE_URL = "https://your-project.supabase.co"
-SUPABASE_KEY = "your-supabase-anon-key"
-```
-
-### Running the Application
-
-```bash
-streamlit run app.py
-```
-
----
-
-## 📁 Project Structure
-
-```
-ai-interview-simulator/
-├── app.py                    # Main Streamlit application
-├── requirements.txt          # Python dependencies
-├── .streamlit/
-│   └── secrets.toml          # API keys and environment config (not committed)
-└── README.md                 # This file
-```
 
 ---
 
